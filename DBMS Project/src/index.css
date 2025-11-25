@@ -1,0 +1,43 @@
+:root {
+  font-family: Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  /* Reset text color to standard dark gray */
+  color: #333;
+  background-color: #f4f4f9;
+}
+
+/* 1. Global Reset */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* 2. Force Body to Full Width */
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  background-color: #f4f4f9;
+
+  /* IMPORTANT: We removed 'display: flex' and 'place-items: center' */
+  display: block;
+}
+
+/* 3. Force React Root to Full Width */
+#root {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  /* Removes the width restriction */
+  margin: 0;
+  padding: 0;
+}
+
+/* Optional: Keep your button styles if you like them, or use the inline styles in the Dashboard */
+button {
+  cursor: pointer;
+}

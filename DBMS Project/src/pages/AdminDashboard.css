@@ -1,0 +1,300 @@
+/* client/src/pages/AdminDashboard.css */
+
+/* --- 1. THEME VARIABLES (Sahyadri Colors) --- */
+:root {
+    --primary-green: #1b5e20;
+    /* College Logo Green */
+    --accent-gold: #ff6f00;
+    /* College Logo Orange */
+    --bg-light: #f3f4f6;
+    --white: #ffffff;
+    --text-dark: #1f2937;
+    --text-gray: #6b7280;
+    --danger: #dc2626;
+    --success: #16a34a;
+}
+
+body {
+    background-color: var(--bg-light);
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* --- 2. LAYOUT --- */
+.dashboard-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #e5e7eb;
+}
+
+.brand-title {
+    color: var(--primary-green);
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.brand-subtitle {
+    color: var(--text-gray);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* --- 3. CONTROL PANEL (The Top Card) --- */
+.control-panel {
+    background: var(--white);
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
+    display: flex;
+    align-items: flex-end;
+    gap: 20px;
+    border-left: 5px solid var(--accent-gold);
+}
+
+.input-group label {
+    display: block;
+    font-size: 12px;
+    text-transform: uppercase;
+    color: var(--text-gray);
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.input-group input {
+    padding: 12px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 16px;
+    width: 140px;
+    transition: border-color 0.2s;
+}
+
+.input-group input:focus {
+    border-color: var(--primary-green);
+    outline: none;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-primary {
+    background-color: var(--primary-green);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: #14532d;
+    transform: translateY(-1px);
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-secondary {
+    background-color: var(--white);
+    color: var(--text-dark);
+    border: 2px solid #e5e7eb;
+}
+
+.btn-secondary:hover {
+    border-color: var(--text-gray);
+    background-color: #f9fafb;
+}
+
+/* --- 4. MAIN GRID LAYOUT --- */
+.main-content {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+    /* 3 parts Room, 1 part Faculty */
+    gap: 30px;
+}
+
+/* --- 5. ROOM VISUALIZER --- */
+.room-card {
+    background: var(--white);
+    border-radius: 16px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+    min-height: 600px;
+}
+
+.room-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+}
+
+.room-tab {
+    padding: 10px 20px;
+    border-radius: 50px;
+    background: #f3f4f6;
+    border: none;
+    color: var(--text-gray);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.room-tab.active {
+    background: var(--primary-green);
+    color: white;
+    box-shadow: 0 4px 6px rgba(27, 94, 32, 0.3);
+}
+
+.seating-grid {
+    display: grid;
+    gap: 20px;
+    padding: 20px;
+    background: #f8fafc;
+    border-radius: 12px;
+    border: 2px dashed #e2e8f0;
+    overflow-x: auto;
+}
+
+/* --- 6. THE BENCH UI --- */
+.bench-container {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transition: transform 0.2s;
+}
+
+.bench-container:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 12px rgba(0, 0, 0, 0.1);
+    border-color: var(--primary-green);
+}
+
+.bench-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: #94a3b8;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+}
+
+.seats-row {
+    display: flex;
+    width: 100%;
+    gap: 8px;
+}
+
+.seat {
+    flex: 1;
+    border-radius: 8px;
+    padding: 12px 5px;
+    text-align: center;
+    font-size: 12px;
+    position: relative;
+    min-height: 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.seat.empty {
+    background-color: #f1f5f9;
+    border: 2px dashed #cbd5e1;
+    color: #cbd5e1;
+}
+
+.seat.filled-a {
+    background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+}
+
+.seat.filled-b {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border: 1px solid #bbf7d0;
+    color: #166534;
+}
+
+.usn-text {
+    font-weight: 700;
+    display: block;
+}
+
+.sub-text {
+    font-size: 9px;
+    opacity: 0.8;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* --- 7. FACULTY CARD --- */
+.faculty-card {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    height: fit-content;
+}
+
+.faculty-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.faculty-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f3f4f6;
+}
+
+.faculty-name {
+    font-weight: 500;
+    color: var(--text-dark);
+}
+
+.room-badge {
+    background: var(--accent-gold);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* Mobile Responsive */
+@media (max-width: 1024px) {
+    .main-content {
+        grid-template-columns: 1fr;
+    }
+
+    .control-panel {
+        flex-wrap: wrap;
+    }
+}
