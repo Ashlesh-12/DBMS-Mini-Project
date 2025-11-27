@@ -6,13 +6,11 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ==========================================
-// 1. DATABASE CONNECTION
-// ==========================================
+
 const db = mysql.createConnection({
     host: 'localhost',
     user: 'root',
-    password: 'Ashlesh@12', // <--- IMPORTANT: Update this
+    password: 'Ashlesh@12',
     database: 'aeras_db'
 });
 
@@ -21,9 +19,6 @@ db.connect((err) => {
     else console.log('Connected to MySQL Database (aeras_db)');
 });
 
-// ==========================================
-// 2. GET APIs (Fetching Data)
-// ==========================================
 
 // Get All Rooms
 app.get('/rooms', (req, res) => {
@@ -81,9 +76,6 @@ app.get('/search-student/:usn', (req, res) => {
     });
 });
 
-// ==========================================
-// 3. CORE LOGIC APIs (Allocation)
-// ==========================================
 
 // ALLOCATE STUDENTS (Sorted by USN + 2 Per Bench)
 app.post('/allocate', async (req, res) => {
@@ -172,9 +164,6 @@ app.post('/allocate-faculty', async (req, res) => {
     }
 });
 
-// ==========================================
-// 4. DATA ENTRY APIs (Dynamic Forms)
-// ==========================================
 
 // Add Faculty
 app.post('/add-faculty', async (req, res) => {
@@ -201,6 +190,69 @@ app.post('/add-student', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).send({ message: "Error: USN might exist." });
+    }
+});
+
+// 8. Add a New Student (USING STORED PROCEDURE)
+app.post('/add-student', async (req, res) => {
+    const { usn, name, semester } = req.body;
+
+    try {
+        const sql = 'CALL AddStudentData(?, ?, ?)';
+        await db.promise().query(sql, [usn, name, semester]);
+
+        res.send({ message: "Student Added via Stored Procedure!" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Error: USN already exists or Invalid Data." });
+    }
+});
+
+// 9. REPORTING API (Triggers the Cursor)
+app.get('/room-reports', async (req, res) => {
+    try {
+        // Step 1: Execute the Stored Procedure (The Cursor Logic)
+        await db.promise().query('CALL GenerateRoomReport()');
+        
+        // Step 2: Select the data it just generated
+        const [rows] = await db.promise().query('SELECT * FROM RoomStats');
+        
+        res.send(rows);
+    } catch (err) {
+        console.error("Report Error:", err);
+        res.status(500).send({ message: "Error executing cursor." });
+    }
+});
+
+// 10. GET ALL STUDENTS (For the Manage Data list)
+app.get('/students', (req, res) => {
+    db.query('SELECT * FROM Students ORDER BY USN ASC', (err, result) => {
+        if (err) return res.status(500).send(err);
+        res.send(result);
+    });
+});
+
+// 11. DELETE STUDENT (Using Stored Procedure)
+app.delete('/delete-student/:usn', async (req, res) => {
+    const { usn } = req.params;
+    try {
+        await db.promise().query('CALL DeleteStudent(?)', [usn]);
+        res.send({ message: "Student Deleted Successfully" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Error deleting student" });
+    }
+});
+
+// 12. UPDATE STUDENT (Using Stored Procedure)
+app.put('/update-student', async (req, res) => {
+    const { usn, name, semester } = req.body;
+    try {
+        await db.promise().query('CALL UpdateStudentData(?, ?, ?)', [usn, name, semester]);
+        res.send({ message: "Student Updated Successfully" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send({ message: "Error updating student" });
     }
 });
 
