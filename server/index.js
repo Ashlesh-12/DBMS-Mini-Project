@@ -260,7 +260,7 @@ app.get('/room-reports', async (req, res) => {
 
 // 10. GET ALL STUDENTS (For the Manage Data list)
 app.get('/students', (req, res) => {
-    db.query('SELECT * FROM Students ORDER BY USN ASC', (err, result) => {
+    db.query('SELECT * FROM students ORDER BY USN ASC', (err, result) => {
         if (err) return res.status(500).send(err);
         res.send(result);
     });
