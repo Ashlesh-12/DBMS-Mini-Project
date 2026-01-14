@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import './AdminDashboard.css'; // We reuse the nice CSS we already made
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 function StudentLookup() {
   const [usn, setUsn] = useState('');
   const [studentData, setStudentData] = useState(null);
@@ -13,7 +15,7 @@ function StudentLookup() {
     setStudentData(null);
     
     try {
-      const res = await axios.get(`http://localhost:3001/search-student/${usn}`);
+      const res = await axios.get(`${API_BASE_URL}/search-student/${usn}`);
       setStudentData(res.data);
     } catch (err) {
       setError('Student not found or seat not allocated yet.');

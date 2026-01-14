@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './AdminDashboard.css';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL;
+
 function AdminDashboard() {
   // --- STATE MANAGEMENT ---
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -34,10 +36,10 @@ function AdminDashboard() {
   }, []);
 
   // --- API CALLS ---
-  const fetchRooms = () => axios.get('http://localhost:3001/rooms').then(res => setRooms(res.data));
-  const fetchFaculty = () => axios.get('http://localhost:3001/faculty-allocations').then(res => setFacultyList(res.data));
-  const fetchReports = () => axios.get('http://localhost:3001/room-reports').then(res => setReports(res.data));
-  const fetchStudents = () => axios.get('http://localhost:3001/students').then(res => setStudentList(res.data));
+  const fetchRooms = () => axios.get(`${API_BASE_URL}/rooms`).then(res => setRooms(res.data));
+  const fetchFaculty = () => axios.get(`${API_BASE_URL}/faculty-allocations`).then(res => setFacultyList(res.data));
+  const fetchReports = () => axios.get(`${API_BASE_URL}/room-reports`).then(res => setReports(res.data));
+  const fetchStudents = () => axios.get(`${API_BASE_URL}/students`).then(res => setStudentList(res.data));
 
   // --- VALIDATION LOGIC (NEW) ---
   const validateStudentForm = () => {
@@ -89,7 +91,7 @@ function AdminDashboard() {
 
     setStatus('Allocating...');
     try {
-      await axios.post('http://localhost:3001/allocate', { examId1: exam1, examId2: exam2 });
+      await axios.post(`${API_BASE_URL}/allocate`, { examId1: exam1, examId2: exam2 });
       setStatus('Success');
       if (selectedRoom) viewRoom(selectedRoom);
     } catch (error) { setStatus('Error'); }
@@ -101,11 +103,11 @@ function AdminDashboard() {
 
     try {
       if (isEditing) {
-        await axios.put('http://localhost:3001/update-student', newStudent);
+        await axios.put(`${API_BASE_URL}/update-student`, newStudent);
         setFormStatus(`✅ Updated Student: ${newStudent.name}`);
         setIsEditing(false);
       } else {
-        await axios.post('http://localhost:3001/add-student', newStudent);
+        await axios.post(`${API_BASE_URL}/add-student`, newStudent);
         setFormStatus(`✅ Added Student: ${newStudent.name}`);
       }
       setNewStudent({ usn: '', name: '', semester: '5' });
@@ -115,11 +117,11 @@ function AdminDashboard() {
   };
 
   // ... (Other handlers remain the same)
-  const handleFacultyAllocation = async () => { await axios.post('http://localhost:3001/allocate-faculty'); fetchFaculty(); };
-  const viewRoom = async (roomId) => { setSelectedRoom(roomId); const res = await axios.get(`http://localhost:3001/room-view/${roomId}`); setRoomData(res.data); };
-  const submitFaculty = async (e) => { e.preventDefault(); try { await axios.post('http://localhost:3001/add-faculty', newFaculty); setFormStatus(`✅ Added Faculty: ${newFaculty.name}`); setNewFaculty({ name: '', dept: 'CS' }); fetchFaculty(); } catch (err) { setFormStatus('❌ Error adding faculty'); } };
-  const handleDeleteStudent = async (usn) => { if (!window.confirm(`Delete ${usn}?`)) return; try { await axios.delete(`http://localhost:3001/delete-student/${usn}`); fetchStudents(); } catch (err) { alert("Failed delete"); } };
-  
+  const handleFacultyAllocation = async () => { await axios.post(`${API_BASE_URL}/allocate-faculty`); fetchFaculty(); };
+  const viewRoom = async (roomId) => { setSelectedRoom(roomId); const res = await axios.get(`${API_BASE_URL}/room-view/${roomId}`); setRoomData(res.data); };
+  const submitFaculty = async (e) => { e.preventDefault(); try { await axios.post(`${API_BASE_URL}/add-faculty`, newFaculty); setFormStatus(`✅ Added Faculty: ${newFaculty.name}`); setNewFaculty({ name: '', dept: 'CS' }); fetchFaculty(); } catch (err) { setFormStatus('❌ Error adding faculty'); } };
+  const handleDeleteStudent = async (usn) => { if (!window.confirm(`Delete ${usn}?`)) return; try { await axios.delete(`${API_BASE_URL}/delete-student/${usn}`); fetchStudents(); } catch (err) { alert("Failed delete"); } };
+
   const handleEditClick = (student) => {
     setNewStudent({ usn: student.USN, name: student.Name, semester: student.Semester });
     setIsEditing(true);
@@ -172,14 +174,35 @@ function AdminDashboard() {
                   {Array.from({ length: roomData.room.BenchColumns * roomData.room.TotalBenchesPerRow }).map((_, i) => {
                     const col = (i % roomData.room.BenchColumns) + 1;
                     const row = Math.floor(i / roomData.room.BenchColumns) + 1;
+                    
+                    // Find students for Seat 1, 2, and 3
                     const s1 = roomData.seats.find(s => s.BenchColumnNumber === col && s.BenchRowNumber === row && s.SeatPosition === 1);
                     const s2 = roomData.seats.find(s => s.BenchColumnNumber === col && s.BenchRowNumber === row && s.SeatPosition === 2);
+                    const s3 = roomData.seats.find(s => s.BenchColumnNumber === col && s.BenchRowNumber === row && s.SeatPosition === 3);
+
                     return (
                       <div key={i} className="bench-container">
                         <span className="bench-label">BENCH {col}-{row}</span>
-                        <div className="seats-row">
-                          <div className={`seat ${s1 ? 'filled-a' : 'empty'}`}>{s1 ? <><span className="usn-text">{s1.USN}</span><span className="sub-text">{s1.SubjectCode}</span></> : <span>Empty</span>}</div>
-                          <div className={`seat ${s2 ? 'filled-b' : 'empty'}`}>{s2 ? <><span className="usn-text">{s2.USN}</span><span className="sub-text">{s2.SubjectCode}</span></> : <span>Empty</span>}</div>
+                        <div className="seats-row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '5px' }}>
+                          
+                          {/* SEAT 1 */}
+                          <div className={`seat ${s1 ? (s1.SeatPosition === 1 && col % 2 !== 0 ? 'filled-a' : 'filled-b') : 'empty'}`} 
+                               style={s1 ? { background: '#e3f2fd', border: '1px solid #90caf9' } : {}}>
+                            {s1 ? <><span className="usn-text">{s1.USN}</span><span className="sub-text">{s1.SubjectCode}</span></> : <span>1</span>}
+                          </div>
+
+                          {/* SEAT 2 */}
+                          <div className={`seat ${s2 ? (s2.SeatPosition === 2 && col % 2 !== 0 ? 'filled-b' : 'filled-a') : 'empty'}`}
+                               style={s2 ? { background: '#e8f5e9', border: '1px solid #a5d6a7' } : {}}>
+                            {s2 ? <><span className="usn-text">{s2.USN}</span><span className="sub-text">{s2.SubjectCode}</span></> : <span>2</span>}
+                          </div>
+
+                          {/* SEAT 3 */}
+                          <div className={`seat ${s3 ? (s3.SeatPosition === 3 && col % 2 !== 0 ? 'filled-a' : 'filled-b') : 'empty'}`}
+                               style={s3 ? { background: '#e3f2fd', border: '1px solid #90caf9' } : {}}>
+                            {s3 ? <><span className="usn-text">{s3.USN}</span><span className="sub-text">{s3.SubjectCode}</span></> : <span>3</span>}
+                          </div>
+
                         </div>
                       </div>
                     );

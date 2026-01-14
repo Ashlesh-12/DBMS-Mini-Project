@@ -201,9 +201,13 @@ body {
 }
 
 .seats-row {
-    display: flex;
+    display: grid;
+    /* Changed from flex to grid */
+    grid-template-columns: 1fr 1fr 1fr;
+    /* 3 Equal Columns */
     width: 100%;
-    gap: 8px;
+    gap: 4px;
+    /* Smaller gap to fit 3 items */
 }
 
 .seat {
@@ -217,6 +221,11 @@ body {
     display: flex;
     flex-direction: column;
     justify-content: center;
+    padding: 8px 2px;
+        /* Reduce padding to fit text */
+    font-size: 10px;
+        /* Slightly smaller font */
+    min-height: 50px;
 }
 
 .seat.empty {
@@ -240,6 +249,9 @@ body {
 .usn-text {
     font-weight: 700;
     display: block;
+    font-size: 10px;
+    /* Ensure USN fits */
+    word-break: break-all;
 }
 
 .sub-text {
