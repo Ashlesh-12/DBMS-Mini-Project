@@ -25,7 +25,7 @@ db.connect((err) => {
 
 // Get All Rooms
 app.get('/rooms', (req, res) => {
-    db.query('SELECT * FROM Rooms', (err, result) => {
+    db.query('SELECT * FROM rooms', (err, result) => {
         if (err) return res.status(500).send(err);
         res.send(result);
     });
