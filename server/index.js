@@ -1,6 +1,8 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
+const dotenv = require('dotenv');
+dotenv.config();
 const app = express();
 
 app.use(cors());
@@ -8,10 +10,11 @@ app.use(express.json());
 
 
 const db = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: 'Ashlesh@12',
-    database: 'aeras_db'
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT,
 });
 
 db.connect((err) => {
@@ -78,62 +81,93 @@ app.get('/search-student/:usn', (req, res) => {
 
 
 // ALLOCATE STUDENTS (Sorted by USN + 2 Per Bench)
+// 4. STUDENT ALLOCATION ALGORITHM (3 Seats Per Bench - Checkerboard Pattern)
+// 4. STUDENT ALLOCATION (3 Seats Per Bench - VERTICAL FILLING)
 app.post('/allocate', async (req, res) => {
     const { examId1, examId2 } = req.body; 
 
     try {
-        // --- UPDATED: Added ORDER BY USN ASC ---
+        // 1. Fetch Students Sorted by USN (Ascending)
         const [students1] = await db.promise().query(
-            'SELECT * FROM Student_Exam_Map WHERE ExamID = ? ORDER BY USN ASC', 
-            [examId1]
+            'SELECT * FROM Student_Exam_Map WHERE ExamID = ? ORDER BY USN ASC', [examId1]
         );
         const [students2] = await db.promise().query(
-            'SELECT * FROM Student_Exam_Map WHERE ExamID = ? ORDER BY USN ASC', 
-            [examId2]
+            'SELECT * FROM Student_Exam_Map WHERE ExamID = ? ORDER BY USN ASC', [examId2]
         );
         
         const [rooms] = await db.promise().query('SELECT * FROM Rooms');
-
-        let s1Index = 0;
-        let s2Index = 0;
         
         // Clear previous allocations
         await db.promise().query('DELETE FROM Allocation WHERE ExamID IN (?, ?)', [examId1, examId2]);
 
-        for (const room of rooms) {
-            const columns = room.BenchColumns;
-            const rows = room.TotalBenchesPerRow;
+        let s1Index = 0;
+        let s2Index = 0;
 
-            // Column-First Fill
+        // 2. Loop through Rooms
+        for (const room of rooms) {
+            const columns = room.BenchColumns;      // 3
+            const rows = room.TotalBenchesPerRow;   // 3 or 5
+
+            // --- GENERATE VERTICAL SLOTS FOR EXAM 1 ---
+            // We find every seat meant for Exam 1 and fill them sequentially vertically
             for (let col = 1; col <= columns; col++) {
+                const isOddCol = (col % 2 !== 0);
                 
-                // Seat 1 (Left - Exam A)
-                for (let row = 1; row <= rows; row++) {
-                    if (s1Index < students1.length) {
-                        const student = students1[s1Index++];
-                        const sql = `INSERT INTO Allocation (USN, ExamID, RoomID, BenchColumnNumber, BenchRowNumber, SeatPosition) VALUES (?, ?, ?, ?, ?, 1)`;
-                        await db.promise().query(sql, [student.USN, examId1, room.RoomID, col, row]);
+                // Logic: 
+                // Odd Cols (1,3): Exam 1 is in Seat 1 & Seat 3
+                // Even Cols (2):  Exam 1 is in Seat 2
+                let seatPositionsForExam1 = isOddCol ? [1, 3] : [2];
+
+                for (let seatPos of seatPositionsForExam1) {
+                    // FILL VERTICALLY (Row 1 -> Row N)
+                    for (let row = 1; row <= rows; row++) {
+                        if (s1Index < students1.length) {
+                            const student = students1[s1Index++];
+                            await allocateSeat(student, examId1, room.RoomID, col, row, seatPos);
+                        }
                     }
                 }
+            }
 
-                // Seat 2 (Right - Exam B)
-                for (let row = 1; row <= rows; row++) {
-                    if (s2Index < students2.length) {
-                        const student = students2[s2Index++];
-                        const sql = `INSERT INTO Allocation (USN, ExamID, RoomID, BenchColumnNumber, BenchRowNumber, SeatPosition) VALUES (?, ?, ?, ?, ?, 2)`;
-                        await db.promise().query(sql, [student.USN, examId2, room.RoomID, col, row]);
+            // --- GENERATE VERTICAL SLOTS FOR EXAM 2 ---
+            // We find every seat meant for Exam 2 and fill them sequentially vertically
+            for (let col = 1; col <= columns; col++) {
+                const isOddCol = (col % 2 !== 0);
+
+                // Logic: Opposite of Exam 1
+                // Odd Cols (1,3): Exam 2 is in Seat 2
+                // Even Cols (2):  Exam 2 is in Seat 1 & Seat 3
+                let seatPositionsForExam2 = isOddCol ? [2] : [1, 3];
+
+                for (let seatPos of seatPositionsForExam2) {
+                    // FILL VERTICALLY (Row 1 -> Row N)
+                    for (let row = 1; row <= rows; row++) {
+                        if (s2Index < students2.length) {
+                            const student = students2[s2Index++];
+                            await allocateSeat(student, examId2, room.RoomID, col, row, seatPos);
+                        }
                     }
                 }
             }
         }
-        res.send({ message: "Allocation Successful (Sorted)" });
+        res.send({ message: "Allocation Successful: Vertical Sequential Order!" });
 
     } catch (error) {
-        console.error(error);
+        console.error("Allocation Error:", error);
         res.status(500).send(error);
     }
 });
 
+// Helper Function
+async function allocateSeat(student, examId, roomId, col, row, seatPos) {
+    const sql = `INSERT INTO Allocation (USN, ExamID, RoomID, BenchColumnNumber, BenchRowNumber, SeatPosition) VALUES (?, ?, ?, ?, ?, ?)`;
+    await db.promise().query(sql, [student.USN, examId, roomId, col, row, seatPos]);
+}
+// Helper function to keep code clean
+async function allocateSeat(student, examId, roomId, col, row, seatPos) {
+    const sql = `INSERT INTO Allocation (USN, ExamID, RoomID, BenchColumnNumber, BenchRowNumber, SeatPosition) VALUES (?, ?, ?, ?, ?, ?)`;
+    await db.promise().query(sql, [student.USN, examId, roomId, col, row, seatPos]);
+}
 // ALLOCATE FACULTY (Random & Unique)
 app.post('/allocate-faculty', async (req, res) => {
     try {
