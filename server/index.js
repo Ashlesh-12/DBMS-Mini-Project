@@ -34,11 +34,11 @@ app.get('/rooms', (req, res) => {
 // Get Visual Room Data (Grid View)
 app.get('/room-view/:roomId', (req, res) => {
     const { roomId } = req.params;
-    const roomSql = 'SELECT * FROM Rooms WHERE RoomID = ?';
+    const roomSql = 'SELECT * FROM rooms WHERE RoomID = ?';
     const allocSql = `SELECT a.SeatPosition, a.BenchColumnNumber, a.BenchRowNumber, s.USN, s.Name, e.SubjectCode 
-                      FROM Allocation a
-                      JOIN Students s ON a.USN = s.USN
-                      JOIN Exams e ON a.ExamID = e.ExamID
+                      FROM allocation a
+                      JOIN students s ON a.USN = s.USN
+                      JOIN exams e ON a.ExamID = e.ExamID
                       WHERE a.RoomID = ?`;
 
     db.query(roomSql, [roomId], (err, roomResult) => {
@@ -53,9 +53,9 @@ app.get('/room-view/:roomId', (req, res) => {
 // Get Faculty List
 app.get('/faculty-allocations', (req, res) => {
     const sql = `SELECT f.Name, r.RoomNumber 
-                 FROM Faculty_Allocation fa
-                 JOIN Faculty f ON fa.FacultyID = f.FacultyID
-                 JOIN Rooms r ON fa.RoomID = r.RoomID`;
+                 FROM faculty_allocation fa
+                 JOIN faculty f ON fa.FacultyID = f.FacultyID
+                 JOIN rooms r ON fa.RoomID = r.RoomID`;
     db.query(sql, (err, result) => {
         if (err) return res.status(500).send(err);
         res.send(result);
@@ -66,10 +66,10 @@ app.get('/faculty-allocations', (req, res) => {
 app.get('/search-student/:usn', (req, res) => {
     const { usn } = req.params;
     const sql = `SELECT s.Name, s.USN, r.RoomNumber, a.BenchColumnNumber, a.BenchRowNumber, a.SeatPosition, e.SubjectCode 
-                 FROM Allocation a
-                 JOIN Students s ON a.USN = s.USN
-                 JOIN Rooms r ON a.RoomID = r.RoomID
-                 JOIN Exams e ON a.ExamID = e.ExamID
+                 FROM allocation a
+                 JOIN students s ON a.USN = s.USN
+                 JOIN rooms r ON a.RoomID = r.RoomID
+                 JOIN exams e ON a.ExamID = e.ExamID
                  WHERE s.USN = ?`;
 
     db.query(sql, [usn], (err, result) => {
@@ -89,16 +89,16 @@ app.post('/allocate', async (req, res) => {
     try {
         // 1. Fetch Students Sorted by USN (Ascending)
         const [students1] = await db.promise().query(
-            'SELECT * FROM Student_Exam_Map WHERE ExamID = ? ORDER BY USN ASC', [examId1]
+            'SELECT * FROM student_exam_map WHERE ExamID = ? ORDER BY USN ASC', [examId1]
         );
         const [students2] = await db.promise().query(
-            'SELECT * FROM Student_Exam_Map WHERE ExamID = ? ORDER BY USN ASC', [examId2]
+            'SELECT * FROM student_exam_map WHERE ExamID = ? ORDER BY USN ASC', [examId2]
         );
-        
-        const [rooms] = await db.promise().query('SELECT * FROM Rooms');
-        
+
+        const [rooms] = await db.promise().query('SELECT * FROM rooms');
+
         // Clear previous allocations
-        await db.promise().query('DELETE FROM Allocation WHERE ExamID IN (?, ?)', [examId1, examId2]);
+        await db.promise().query('DELETE FROM allocation WHERE ExamID IN (?, ?)', [examId1, examId2]);
 
         let s1Index = 0;
         let s2Index = 0;
@@ -160,20 +160,20 @@ app.post('/allocate', async (req, res) => {
 
 // Helper Function
 async function allocateSeat(student, examId, roomId, col, row, seatPos) {
-    const sql = `INSERT INTO Allocation (USN, ExamID, RoomID, BenchColumnNumber, BenchRowNumber, SeatPosition) VALUES (?, ?, ?, ?, ?, ?)`;
+    const sql = `INSERT INTO allocation (USN, ExamID, RoomID, BenchColumnNumber, BenchRowNumber, SeatPosition) VALUES (?, ?, ?, ?, ?, ?)`;
     await db.promise().query(sql, [student.USN, examId, roomId, col, row, seatPos]);
 }
 // Helper function to keep code clean
 async function allocateSeat(student, examId, roomId, col, row, seatPos) {
-    const sql = `INSERT INTO Allocation (USN, ExamID, RoomID, BenchColumnNumber, BenchRowNumber, SeatPosition) VALUES (?, ?, ?, ?, ?, ?)`;
+    const sql = `INSERT INTO allocation (USN, ExamID, RoomID, BenchColumnNumber, BenchRowNumber, SeatPosition) VALUES (?, ?, ?, ?, ?, ?)`;
     await db.promise().query(sql, [student.USN, examId, roomId, col, row, seatPos]);
 }
 // ALLOCATE FACULTY (Random & Unique)
 app.post('/allocate-faculty', async (req, res) => {
     try {
-        await db.promise().query('DELETE FROM Faculty_Allocation');
-        const [rooms] = await db.promise().query('SELECT RoomID FROM Rooms');
-        const [faculty] = await db.promise().query('SELECT FacultyID FROM Faculty');
+        await db.promise().query('DELETE FROM faculty_allocation');
+        const [rooms] = await db.promise().query('SELECT RoomID FROM rooms');
+        const [faculty] = await db.promise().query('SELECT FacultyID FROM faculty');
 
         // Shuffle Faculty
         for (let i = faculty.length - 1; i > 0; i--) {
@@ -185,7 +185,7 @@ app.post('/allocate-faculty', async (req, res) => {
         for (let i = 0; i < rooms.length; i++) {
             if (i < faculty.length) {
                 await db.promise().query(
-                    'INSERT INTO Faculty_Allocation (FacultyID, RoomID, ExamDate) VALUES (?, ?, CURDATE())',
+                    'INSERT INTO faculty_allocation (FacultyID, RoomID, ExamDate) VALUES (?, ?, CURDATE())',
                     [faculty[i].FacultyID, rooms[i].RoomID]
                 );
             }
@@ -203,7 +203,7 @@ app.post('/allocate-faculty', async (req, res) => {
 app.post('/add-faculty', async (req, res) => {
     const { name, dept } = req.body;
     try {
-        await db.promise().query('INSERT INTO Faculty (Name, Department) VALUES (?, ?)', [name, dept]);
+        await db.promise().query('INSERT INTO faculty (Name, Department) VALUES (?, ?)', [name, dept]);
         res.send({ message: "Faculty Added!" });
     } catch (err) {
         res.status(500).send({ message: "Error adding faculty." });
@@ -216,9 +216,9 @@ app.post('/add-student', async (req, res) => {
     let examId = (parseInt(semester) === 5) ? 1 : (parseInt(semester) === 7) ? 2 : null;
 
     try {
-        await db.promise().query('INSERT INTO Students (USN, Name, Semester) VALUES (?, ?, ?)', [usn, name, semester]);
+        await db.promise().query('INSERT INTO students (USN, Name, Semester) VALUES (?, ?, ?)', [usn, name, semester]);
         if (examId) {
-            await db.promise().query('INSERT INTO Student_Exam_Map (USN, ExamID) VALUES (?, ?)', [usn, examId]);
+            await db.promise().query('INSERT INTO student_exam_map (USN, ExamID) VALUES (?, ?)', [usn, examId]);
         }
         res.send({ message: "Student Added!" });
     } catch (err) {
@@ -249,7 +249,7 @@ app.get('/room-reports', async (req, res) => {
         await db.promise().query('CALL GenerateRoomReport()');
         
         // Step 2: Select the data it just generated
-        const [rows] = await db.promise().query('SELECT * FROM RoomStats');
+        const [rows] = await db.promise().query('SELECT * FROM roomstats');
         
         res.send(rows);
     } catch (err) {
