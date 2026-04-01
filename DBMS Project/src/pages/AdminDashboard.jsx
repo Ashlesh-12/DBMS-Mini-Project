@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './AdminDashboard.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 function AdminDashboard() {
   // --- STATE MANAGEMENT ---
@@ -30,16 +30,16 @@ function AdminDashboard() {
   // VALIDATION STATE (NEW)
   const [errors, setErrors] = useState({});
 
-  useEffect(() => {
-    fetchRooms();
-    fetchFaculty();
-  }, []);
-
   // --- API CALLS ---
   const fetchRooms = () => axios.get(`${API_BASE_URL}/rooms`).then(res => setRooms(res.data));
   const fetchFaculty = () => axios.get(`${API_BASE_URL}/faculty-allocations`).then(res => setFacultyList(res.data));
   const fetchReports = () => axios.get(`${API_BASE_URL}/room-reports`).then(res => setReports(res.data));
   const fetchStudents = () => axios.get(`${API_BASE_URL}/students`).then(res => setStudentList(res.data));
+
+  useEffect(() => {
+    fetchRooms();
+    fetchFaculty();
+  }, []);
 
   // --- VALIDATION LOGIC (NEW) ---
   const validateStudentForm = () => {
@@ -75,11 +75,11 @@ function AdminDashboard() {
 
   const validateAllocation = () => {
     if (exam1 <= 0 || exam2 <= 0) {
-      setStatus('❌ Error: Exam IDs must be positive numbers.');
+      setStatus('Error: Exam IDs must be positive numbers.');
       return false;
     }
-    if (exam1 == exam2) { // Loose equality to catch string '1' vs number 1
-      setStatus('❌ Error: You cannot select the same Exam ID twice.');
+    if (Number(exam1) === Number(exam2)) {
+      setStatus('Error: You cannot select the same Exam ID twice.');
       return false;
     }
     return true;
@@ -94,7 +94,7 @@ function AdminDashboard() {
       await axios.post(`${API_BASE_URL}/allocate`, { examId1: exam1, examId2: exam2 });
       setStatus('Success');
       if (selectedRoom) viewRoom(selectedRoom);
-    } catch (error) { setStatus('Error'); }
+    } catch { setStatus('Error'); }
   };
 
   const submitStudent = async (e) => {
@@ -104,29 +104,29 @@ function AdminDashboard() {
     try {
       if (isEditing) {
         await axios.put(`${API_BASE_URL}/update-student`, newStudent);
-        setFormStatus(`✅ Updated Student: ${newStudent.name}`);
+        setFormStatus(`Updated Student: ${newStudent.name}`);
         setIsEditing(false);
       } else {
         await axios.post(`${API_BASE_URL}/add-student`, newStudent);
-        setFormStatus(`✅ Added Student: ${newStudent.name}`);
+        setFormStatus(`Added Student: ${newStudent.name}`);
       }
       setNewStudent({ usn: '', name: '', semester: '5' });
       setErrors({}); // Clear errors
       fetchStudents();
-    } catch (err) { setFormStatus('❌ Error: USN already exists or DB Error'); }
+    } catch { setFormStatus('Error: USN already exists or DB Error'); }
   };
 
   // ... (Other handlers remain the same)
   const handleFacultyAllocation = async () => { await axios.post(`${API_BASE_URL}/allocate-faculty`); fetchFaculty(); };
   const viewRoom = async (roomId) => { setSelectedRoom(roomId); const res = await axios.get(`${API_BASE_URL}/room-view/${roomId}`); setRoomData(res.data); };
-  const submitFaculty = async (e) => { e.preventDefault(); try { await axios.post(`${API_BASE_URL}/add-faculty`, newFaculty); setFormStatus(`✅ Added Faculty: ${newFaculty.name}`); setNewFaculty({ name: '', dept: 'CS' }); fetchFaculty(); } catch (err) { setFormStatus('❌ Error adding faculty'); } };
-  const handleDeleteStudent = async (usn) => { if (!window.confirm(`Delete ${usn}?`)) return; try { await axios.delete(`${API_BASE_URL}/delete-student/${usn}`); fetchStudents(); } catch (err) { alert("Failed delete"); } };
+  const submitFaculty = async (e) => { e.preventDefault(); try { await axios.post(`${API_BASE_URL}/add-faculty`, newFaculty); setFormStatus(`Added Faculty: ${newFaculty.name}`); setNewFaculty({ name: '', dept: 'CS' }); fetchFaculty(); } catch { setFormStatus('Error adding faculty'); } };
+  const handleDeleteStudent = async (usn) => { if (!window.confirm(`Delete ${usn}?`)) return; try { await axios.delete(`${API_BASE_URL}/delete-student/${usn}`); fetchStudents(); } catch { alert("Failed delete"); } };
 
   const handleEditClick = (student) => {
     setNewStudent({ usn: student.USN, name: student.Name, semester: student.Semester });
     setIsEditing(true);
     setErrors({}); // Clear errors when starting edit
-    setFormStatus(`✏️ Editing ${student.USN}...`);
+    setFormStatus(`Editing ${student.USN}...`);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -137,9 +137,9 @@ function AdminDashboard() {
       <header className="dashboard-header">
         <div><h1 className="brand-title">AERAS</h1><p className="brand-subtitle">Sahyadri College Examination Control System</p></div>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button onClick={() => switchTab('dashboard')} className={`btn ${activeTab === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}>📊 Dashboard</button>
-          <button onClick={() => switchTab('entry')} className={`btn ${activeTab === 'entry' ? 'btn-primary' : 'btn-secondary'}`}>➕ Manage Data</button>
-          <button onClick={() => switchTab('reports')} className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}>📈 Reports</button>
+          <button onClick={() => switchTab('dashboard')} className={`btn ${activeTab === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}>Dashboard</button>
+          <button onClick={() => switchTab('entry')} className={`btn ${activeTab === 'entry' ? 'btn-primary' : 'btn-secondary'}`}>Manage Data</button>
+          <button onClick={() => switchTab('reports')} className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}>Reports</button>
         </div>
       </header>
 
@@ -155,9 +155,9 @@ function AdminDashboard() {
               <label>Exam B (Right)</label>
               <input type="number" min="1" value={exam2} onChange={e => setExam2(e.target.value)} />
             </div>
-            <button onClick={handleAllocation} className="btn btn-primary">⚡ Run Allocation</button>
-            <button onClick={handleFacultyAllocation} className="btn btn-secondary">👤 Assign Faculty</button>
-            {status === 'Success' && <span style={{ color: 'green', fontWeight: 'bold', marginLeft: '10px' }}>✅ Ready</span>}
+            <button onClick={handleAllocation} className="btn btn-primary">Run Allocation</button>
+            <button onClick={handleFacultyAllocation} className="btn btn-secondary">Assign Faculty</button>
+            {status === 'Success' && <span style={{ color: 'green', fontWeight: 'bold', marginLeft: '10px' }}>Ready</span>}
             {status.includes('Error') && <span style={{ color: 'red', fontWeight: 'bold', marginLeft: '10px' }}>{status}</span>}
           </section>
 
@@ -231,7 +231,7 @@ function AdminDashboard() {
             
             {/* STUDENT FORM WITH VALIDATION */}
             <div className="faculty-card" style={{ borderColor: isEditing ? '#ff6f00' : 'transparent', borderWidth: isEditing ? '2px' : '0px', borderStyle: 'solid' }}>
-              <h2 style={{ color: isEditing ? '#ff6f00' : '#1b5e20', marginBottom: '15px' }}>{isEditing ? '✏️ Update Student' : 'Add Student'}</h2>
+              <h2 style={{ color: isEditing ? '#ff6f00' : '#1b5e20', marginBottom: '15px' }}>{isEditing ? 'Update Student' : 'Add Student'}</h2>
               <form onSubmit={submitStudent} noValidate>
                 <div style={{ marginBottom: '10px' }}>
                   <label style={{ display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#666' }}>USN {isEditing && '(Locked)'}</label>
@@ -302,8 +302,8 @@ function AdminDashboard() {
                       <td style={{ padding: '12px' }}>{s.Name}</td>
                       <td style={{ padding: '12px' }}>{s.Semester}</td>
                       <td style={{ padding: '12px', display: 'flex', gap: '10px' }}>
-                        <button onClick={() => handleEditClick(s)} style={{ background: '#e0f2fe', color: '#0284c7', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>✏️ Edit</button>
-                        <button onClick={() => handleDeleteStudent(s.USN)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>🗑️ Delete</button>
+                        <button onClick={() => handleEditClick(s)} style={{ background: '#e0f2fe', color: '#0284c7', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>Edit</button>
+                        <button onClick={() => handleDeleteStudent(s.USN)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', padding: '5px 10px', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }}>Delete</button>
                       </td>
                     </tr>
                   ))}
@@ -318,7 +318,7 @@ function AdminDashboard() {
       {activeTab === 'reports' && (
         <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
           <div className="room-card">
-            <h2 style={{ color: '#1b5e20', marginBottom: '10px' }}>📊 Room Occupancy Reports</h2>
+            <h2 style={{ color: '#1b5e20', marginBottom: '10px' }}>Room Occupancy Reports</h2>
             <p style={{ color: '#666', marginBottom: '20px', fontSize: '14px' }}>Generated by <b>MySQL Cursor</b>: <i>GenerateRoomReport()</i></p>
             <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
               <thead>
@@ -346,3 +346,4 @@ function AdminDashboard() {
 }
 
 export default AdminDashboard;
+

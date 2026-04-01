@@ -1,295 +1,280 @@
-const express = require('express');
+﻿const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const dotenv = require('dotenv');
-dotenv.config();
-const app = express();
 
+dotenv.config();
+
+const app = express();
 app.use(cors());
 app.use(express.json());
 
+const env = (key, fallback = '') => (process.env[key] ?? fallback).toString().trim();
 
-const db = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    port: process.env.DB_PORT,
+const db = mysql.createPool({
+  host: env('DB_HOST'),
+  user: env('DB_USER'),
+  password: env('DB_PASSWORD'),
+  database: env('DB_NAME'),
+  port: Number(env('DB_PORT', 3306)),
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 0,
+  ssl: env('DB_SSL', 'false').toLowerCase() === 'true' ? { rejectUnauthorized: false } : undefined,
 });
 
-db.connect((err) => {
-    if (err) console.error('Error connecting to MySQL:', err);
-    else console.log('Connected to MySQL Database (aeras_db)');
-});
+async function query(sql, params = []) {
+  const [rows] = await db.promise().query(sql, params);
+  return rows;
+}
 
+// Health check for deployment/runtime probes
+app.get('/health', async (req, res) => {
+  try {
+    await query('SELECT 1 AS ok');
+    res.send({ status: 'ok', db: 'connected' });
+  } catch (err) {
+    res.status(500).send({ status: 'error', db: 'disconnected', message: err.message });
+  }
+});
 
 // Get All Rooms
-app.get('/rooms', (req, res) => {
-    db.query('SELECT * FROM rooms', (err, result) => {
-        if (err) return res.status(500).send(err);
-        res.send(result);
-    });
+app.get('/rooms', async (req, res) => {
+  try {
+    const rows = await query('SELECT * FROM rooms');
+    res.send(rows);
+  } catch (err) {
+    res.status(500).send({ message: 'Failed to fetch rooms', error: err.message });
+  }
 });
 
 // Get Visual Room Data (Grid View)
-app.get('/room-view/:roomId', (req, res) => {
-    const { roomId } = req.params;
-    const roomSql = 'SELECT * FROM rooms WHERE RoomID = ?';
-    const allocSql = `SELECT a.SeatPosition, a.BenchColumnNumber, a.BenchRowNumber, s.USN, s.Name, e.SubjectCode 
-                      FROM allocation a
-                      JOIN students s ON a.USN = s.USN
-                      JOIN exams e ON a.ExamID = e.ExamID
-                      WHERE a.RoomID = ?`;
+app.get('/room-view/:roomId', async (req, res) => {
+  const { roomId } = req.params;
+  const roomSql = 'SELECT * FROM rooms WHERE RoomID = ?';
+  const allocSql = `SELECT a.SeatPosition, a.BenchColumnNumber, a.BenchRowNumber, s.USN, s.Name, e.SubjectCode
+                    FROM allocation a
+                    JOIN students s ON a.USN = s.USN
+                    JOIN exams e ON a.ExamID = e.ExamID
+                    WHERE a.RoomID = ?`;
 
-    db.query(roomSql, [roomId], (err, roomResult) => {
-        if (err) return res.status(500).send(err);
-        db.query(allocSql, [roomId], (err, allocResult) => {
-            if (err) return res.status(500).send(err);
-            res.send({ room: roomResult[0], seats: allocResult });
-        });
-    });
+  try {
+    const roomResult = await query(roomSql, [roomId]);
+    const allocResult = await query(allocSql, [roomId]);
+    res.send({ room: roomResult[0] ?? null, seats: allocResult });
+  } catch (err) {
+    res.status(500).send({ message: 'Failed to fetch room view', error: err.message });
+  }
 });
 
 // Get Faculty List
-app.get('/faculty-allocations', (req, res) => {
-    const sql = `SELECT f.Name, r.RoomNumber 
-                 FROM faculty_allocation fa
-                 JOIN faculty f ON fa.FacultyID = f.FacultyID
-                 JOIN rooms r ON fa.RoomID = r.RoomID`;
-    db.query(sql, (err, result) => {
-        if (err) return res.status(500).send(err);
-        res.send(result);
-    });
+app.get('/faculty-allocations', async (req, res) => {
+  const sql = `SELECT f.Name, r.RoomNumber
+               FROM faculty_allocation fa
+               JOIN faculty f ON fa.FacultyID = f.FacultyID
+               JOIN rooms r ON fa.RoomID = r.RoomID`;
+
+  try {
+    const rows = await query(sql);
+    res.send(rows);
+  } catch (err) {
+    res.status(500).send({ message: 'Failed to fetch faculty allocations', error: err.message });
+  }
 });
 
 // Search Student Seat (Student Portal)
-app.get('/search-student/:usn', (req, res) => {
-    const { usn } = req.params;
-    const sql = `SELECT s.Name, s.USN, r.RoomNumber, a.BenchColumnNumber, a.BenchRowNumber, a.SeatPosition, e.SubjectCode 
-                 FROM allocation a
-                 JOIN students s ON a.USN = s.USN
-                 JOIN rooms r ON a.RoomID = r.RoomID
-                 JOIN exams e ON a.ExamID = e.ExamID
-                 WHERE s.USN = ?`;
+app.get('/search-student/:usn', async (req, res) => {
+  const usn = req.params.usn.trim();
+  const sql = `SELECT s.Name, s.USN, r.RoomNumber, a.BenchColumnNumber, a.BenchRowNumber, a.SeatPosition, e.SubjectCode
+               FROM allocation a
+               JOIN students s ON a.USN = s.USN
+               JOIN rooms r ON a.RoomID = r.RoomID
+               JOIN exams e ON a.ExamID = e.ExamID
+               WHERE s.USN = ?`;
 
-    db.query(sql, [usn], (err, result) => {
-        if (err) return res.status(500).send(err);
-        if (result.length === 0) return res.status(404).send({ message: "Seat not allocated yet." });
-        res.send(result[0]);
-    });
+  try {
+    const rows = await query(sql, [usn]);
+    if (rows.length === 0) {
+      return res.status(404).send({ message: 'Seat not allocated yet.' });
+    }
+    res.send(rows[0]);
+  } catch (err) {
+    res.status(500).send({ message: 'Failed to search student', error: err.message });
+  }
 });
 
-
-// ALLOCATE STUDENTS (Sorted by USN + 2 Per Bench)
-// 4. STUDENT ALLOCATION ALGORITHM (3 Seats Per Bench - Checkerboard Pattern)
-// 4. STUDENT ALLOCATION (3 Seats Per Bench - VERTICAL FILLING)
 app.post('/allocate', async (req, res) => {
-    const { examId1, examId2 } = req.body; 
+  const { examId1, examId2 } = req.body;
 
-    try {
-        // 1. Fetch Students Sorted by USN (Ascending)
-        const [students1] = await db.promise().query(
-            'SELECT * FROM student_exam_map WHERE ExamID = ? ORDER BY USN ASC', [examId1]
-        );
-        const [students2] = await db.promise().query(
-            'SELECT * FROM student_exam_map WHERE ExamID = ? ORDER BY USN ASC', [examId2]
-        );
+  try {
+    const students1 = await query('SELECT * FROM student_exam_map WHERE ExamID = ? ORDER BY USN ASC', [examId1]);
+    const students2 = await query('SELECT * FROM student_exam_map WHERE ExamID = ? ORDER BY USN ASC', [examId2]);
+    const rooms = await query('SELECT * FROM rooms');
 
-        const [rooms] = await db.promise().query('SELECT * FROM rooms');
+    await query('DELETE FROM allocation WHERE ExamID IN (?, ?)', [examId1, examId2]);
 
-        // Clear previous allocations
-        await db.promise().query('DELETE FROM allocation WHERE ExamID IN (?, ?)', [examId1, examId2]);
+    let s1Index = 0;
+    let s2Index = 0;
 
-        let s1Index = 0;
-        let s2Index = 0;
+    for (const room of rooms) {
+      const columns = room.BenchColumns;
+      const rows = room.TotalBenchesPerRow;
 
-        // 2. Loop through Rooms
-        for (const room of rooms) {
-            const columns = room.BenchColumns;      // 3
-            const rows = room.TotalBenchesPerRow;   // 3 or 5
+      for (let col = 1; col <= columns; col += 1) {
+        const seatPositionsForExam1 = col % 2 !== 0 ? [1, 3] : [2];
 
-            // --- GENERATE VERTICAL SLOTS FOR EXAM 1 ---
-            // We find every seat meant for Exam 1 and fill them sequentially vertically
-            for (let col = 1; col <= columns; col++) {
-                const isOddCol = (col % 2 !== 0);
-                
-                // Logic: 
-                // Odd Cols (1,3): Exam 1 is in Seat 1 & Seat 3
-                // Even Cols (2):  Exam 1 is in Seat 2
-                let seatPositionsForExam1 = isOddCol ? [1, 3] : [2];
-
-                for (let seatPos of seatPositionsForExam1) {
-                    // FILL VERTICALLY (Row 1 -> Row N)
-                    for (let row = 1; row <= rows; row++) {
-                        if (s1Index < students1.length) {
-                            const student = students1[s1Index++];
-                            await allocateSeat(student, examId1, room.RoomID, col, row, seatPos);
-                        }
-                    }
-                }
+        for (const seatPos of seatPositionsForExam1) {
+          for (let row = 1; row <= rows; row += 1) {
+            if (s1Index < students1.length) {
+              const student = students1[s1Index];
+              s1Index += 1;
+              await allocateSeat(student, examId1, room.RoomID, col, row, seatPos);
             }
-
-            // --- GENERATE VERTICAL SLOTS FOR EXAM 2 ---
-            // We find every seat meant for Exam 2 and fill them sequentially vertically
-            for (let col = 1; col <= columns; col++) {
-                const isOddCol = (col % 2 !== 0);
-
-                // Logic: Opposite of Exam 1
-                // Odd Cols (1,3): Exam 2 is in Seat 2
-                // Even Cols (2):  Exam 2 is in Seat 1 & Seat 3
-                let seatPositionsForExam2 = isOddCol ? [2] : [1, 3];
-
-                for (let seatPos of seatPositionsForExam2) {
-                    // FILL VERTICALLY (Row 1 -> Row N)
-                    for (let row = 1; row <= rows; row++) {
-                        if (s2Index < students2.length) {
-                            const student = students2[s2Index++];
-                            await allocateSeat(student, examId2, room.RoomID, col, row, seatPos);
-                        }
-                    }
-                }
-            }
+          }
         }
-        res.send({ message: "Allocation Successful: Vertical Sequential Order!" });
+      }
 
-    } catch (error) {
-        console.error("Allocation Error:", error);
-        res.status(500).send(error);
+      for (let col = 1; col <= columns; col += 1) {
+        const seatPositionsForExam2 = col % 2 !== 0 ? [2] : [1, 3];
+
+        for (const seatPos of seatPositionsForExam2) {
+          for (let row = 1; row <= rows; row += 1) {
+            if (s2Index < students2.length) {
+              const student = students2[s2Index];
+              s2Index += 1;
+              await allocateSeat(student, examId2, room.RoomID, col, row, seatPos);
+            }
+          }
+        }
+      }
     }
+
+    res.send({ message: 'Allocation Successful: Vertical Sequential Order!' });
+  } catch (error) {
+    console.error('Allocation Error:', error);
+    res.status(500).send({ message: 'Allocation failed', error: error.message });
+  }
 });
 
-// Helper Function
 async function allocateSeat(student, examId, roomId, col, row, seatPos) {
-    const sql = `INSERT INTO allocation (USN, ExamID, RoomID, BenchColumnNumber, BenchRowNumber, SeatPosition) VALUES (?, ?, ?, ?, ?, ?)`;
-    await db.promise().query(sql, [student.USN, examId, roomId, col, row, seatPos]);
+  const sql = 'INSERT INTO allocation (USN, ExamID, RoomID, BenchColumnNumber, BenchRowNumber, SeatPosition) VALUES (?, ?, ?, ?, ?, ?)';
+  await query(sql, [student.USN, examId, roomId, col, row, seatPos]);
 }
-// Helper function to keep code clean
-async function allocateSeat(student, examId, roomId, col, row, seatPos) {
-    const sql = `INSERT INTO allocation (USN, ExamID, RoomID, BenchColumnNumber, BenchRowNumber, SeatPosition) VALUES (?, ?, ?, ?, ?, ?)`;
-    await db.promise().query(sql, [student.USN, examId, roomId, col, row, seatPos]);
-}
-// ALLOCATE FACULTY (Random & Unique)
+
 app.post('/allocate-faculty', async (req, res) => {
-    try {
-        await db.promise().query('DELETE FROM faculty_allocation');
-        const [rooms] = await db.promise().query('SELECT RoomID FROM rooms');
-        const [faculty] = await db.promise().query('SELECT FacultyID FROM faculty');
+  try {
+    await query('DELETE FROM faculty_allocation');
+    const rooms = await query('SELECT RoomID FROM rooms');
+    const faculty = await query('SELECT FacultyID FROM faculty');
 
-        // Shuffle Faculty
-        for (let i = faculty.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [faculty[i], faculty[j]] = [faculty[j], faculty[i]];
-        }
-
-        // Assign
-        for (let i = 0; i < rooms.length; i++) {
-            if (i < faculty.length) {
-                await db.promise().query(
-                    'INSERT INTO faculty_allocation (FacultyID, RoomID, ExamDate) VALUES (?, ?, CURDATE())',
-                    [faculty[i].FacultyID, rooms[i].RoomID]
-                );
-            }
-        }
-        res.send({ message: "Faculty Assigned" });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).send(error);
+    for (let i = faculty.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [faculty[i], faculty[j]] = [faculty[j], faculty[i]];
     }
+
+    for (let i = 0; i < rooms.length && i < faculty.length; i += 1) {
+      await query('INSERT INTO faculty_allocation (FacultyID, RoomID, ExamDate) VALUES (?, ?, CURDATE())', [faculty[i].FacultyID, rooms[i].RoomID]);
+    }
+
+    res.send({ message: 'Faculty Assigned' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).send({ message: 'Faculty allocation failed', error: error.message });
+  }
 });
 
-
-// Add Faculty
 app.post('/add-faculty', async (req, res) => {
-    const { name, dept } = req.body;
-    try {
-        await db.promise().query('INSERT INTO faculty (Name, Department) VALUES (?, ?)', [name, dept]);
-        res.send({ message: "Faculty Added!" });
-    } catch (err) {
-        res.status(500).send({ message: "Error adding faculty." });
-    }
+  const { name, dept } = req.body;
+
+  try {
+    await query('INSERT INTO faculty (Name, Department) VALUES (?, ?)', [name, dept]);
+    res.send({ message: 'Faculty Added!' });
+  } catch (err) {
+    res.status(500).send({ message: 'Error adding faculty.', error: err.message });
+  }
 });
 
-// Add Student & Register for Exam
+// Add Student & Register for Exam using stored procedure with fallback.
 app.post('/add-student', async (req, res) => {
-    const { usn, name, semester } = req.body;
-    let examId = (parseInt(semester) === 5) ? 1 : (parseInt(semester) === 7) ? 2 : null;
+  const { usn, name, semester } = req.body;
+  const sem = Number(semester);
+  const examId = sem === 5 ? 1 : sem === 7 ? 2 : null;
 
-    try {
-        await db.promise().query('INSERT INTO students (USN, Name, Semester) VALUES (?, ?, ?)', [usn, name, semester]);
+  try {
+    await query('CALL AddStudentData(?, ?, ?)', [usn, name, semester]);
+    res.send({ message: 'Student Added via Stored Procedure!' });
+  } catch (err) {
+    if (err.code === 'ER_SP_DOES_NOT_EXIST') {
+      try {
+        await query('INSERT INTO students (USN, Name, Semester) VALUES (?, ?, ?)', [usn, name, semester]);
         if (examId) {
-            await db.promise().query('INSERT INTO student_exam_map (USN, ExamID) VALUES (?, ?)', [usn, examId]);
+          await query('INSERT INTO student_exam_map (USN, ExamID) VALUES (?, ?)', [usn, examId]);
         }
-        res.send({ message: "Student Added!" });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: "Error: USN might exist." });
+        return res.send({ message: 'Student Added!' });
+      } catch (fallbackErr) {
+        return res.status(500).send({ message: 'Error adding student', error: fallbackErr.message });
+      }
     }
+
+    console.error(err);
+    res.status(500).send({ message: 'Error: USN already exists or Invalid Data.', error: err.message });
+  }
 });
 
-// 8. Add a New Student (USING STORED PROCEDURE)
-app.post('/add-student', async (req, res) => {
-    const { usn, name, semester } = req.body;
-
-    try {
-        const sql = 'CALL AddStudentData(?, ?, ?)';
-        await db.promise().query(sql, [usn, name, semester]);
-
-        res.send({ message: "Student Added via Stored Procedure!" });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: "Error: USN already exists or Invalid Data." });
-    }
-});
-
-// 9. REPORTING API (Triggers the Cursor)
 app.get('/room-reports', async (req, res) => {
-    try {
-        // Step 1: Execute the Stored Procedure (The Cursor Logic)
-        await db.promise().query('CALL GenerateRoomReport()');
-        
-        // Step 2: Select the data it just generated
-        const [rows] = await db.promise().query('SELECT * FROM roomstats');
-        
-        res.send(rows);
-    } catch (err) {
-        console.error("Report Error:", err);
-        res.status(500).send({ message: "Error executing cursor." });
-    }
+  try {
+    await query('CALL GenerateRoomReport()');
+    const rows = await query('SELECT * FROM roomstats');
+    res.send(rows);
+  } catch (err) {
+    console.error('Report Error:', err);
+    res.status(500).send({ message: 'Error executing cursor.', error: err.message });
+  }
 });
 
-// 10. GET ALL STUDENTS (For the Manage Data list)
-app.get('/students', (req, res) => {
-    db.query('SELECT * FROM students ORDER BY USN ASC', (err, result) => {
-        if (err) return res.status(500).send(err);
-        res.send(result);
-    });
+app.get('/students', async (req, res) => {
+  try {
+    const rows = await query('SELECT * FROM students ORDER BY USN ASC');
+    res.send(rows);
+  } catch (err) {
+    res.status(500).send({ message: 'Failed to fetch students', error: err.message });
+  }
 });
 
-// 11. DELETE STUDENT (Using Stored Procedure)
 app.delete('/delete-student/:usn', async (req, res) => {
-    const { usn } = req.params;
-    try {
-        await db.promise().query('CALL DeleteStudent(?)', [usn]);
-        res.send({ message: "Student Deleted Successfully" });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: "Error deleting student" });
-    }
+  const { usn } = req.params;
+
+  try {
+    await query('CALL DeleteStudent(?)', [usn]);
+    res.send({ message: 'Student Deleted Successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: 'Error deleting student', error: err.message });
+  }
 });
 
-// 12. UPDATE STUDENT (Using Stored Procedure)
 app.put('/update-student', async (req, res) => {
-    const { usn, name, semester } = req.body;
-    try {
-        await db.promise().query('CALL UpdateStudentData(?, ?, ?)', [usn, name, semester]);
-        res.send({ message: "Student Updated Successfully" });
-    } catch (err) {
-        console.error(err);
-        res.status(500).send({ message: "Error updating student" });
-    }
+  const { usn, name, semester } = req.body;
+
+  try {
+    await query('CALL UpdateStudentData(?, ?, ?)', [usn, name, semester]);
+    res.send({ message: 'Student Updated Successfully' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send({ message: 'Error updating student', error: err.message });
+  }
 });
 
-app.listen(3001, () => {
-    console.log("Server running on port 3001");
+const port = Number(env('PORT', 3001));
+app.listen(port, async () => {
+  console.log(`Server running on port ${port}`);
+
+  try {
+    await query('SELECT 1 AS ok');
+    console.log('Connected to MySQL successfully.');
+  } catch (err) {
+    console.error('Initial DB check failed:', err.message);
+  }
 });

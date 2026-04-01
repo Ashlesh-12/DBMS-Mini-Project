@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import axios from 'axios';
 import './AdminDashboard.css'; // We reuse the nice CSS we already made
 
-const API_BASE_URL = import.meta.env.VITE_API_URL;
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 function StudentLookup() {
   const [usn, setUsn] = useState('');
@@ -17,7 +17,7 @@ function StudentLookup() {
     try {
       const res = await axios.get(`${API_BASE_URL}/search-student/${usn}`);
       setStudentData(res.data);
-    } catch (err) {
+    } catch {
       setError('Student not found or seat not allocated yet.');
     }
   };
@@ -67,8 +67,8 @@ function StudentLookup() {
 
               <div style={{ background: 'white', padding: '10px', borderRadius: '8px' }}>
                  <span style={{ fontSize: '10px', color: '#888', textTransform: 'uppercase' }}>Seat Side</span>
-                 <div style={{ fontSize: '16px', fontWeight: 'bold', color: studentData.SeatPosition === 1 ? '#1565c0' : '#166534' }}>
-                   {studentData.SeatPosition === 1 ? 'Left (Blue)' : 'Right (Green)'}
+                 <div style={{ fontSize: '16px', fontWeight: 'bold', color: studentData.SeatPosition === 1 ? '#1565c0' : studentData.SeatPosition === 2 ? '#6b7280' : '#166534' }}>
+                   {studentData.SeatPosition === 1 ? 'Left (Blue)' : studentData.SeatPosition === 2 ? 'Center' : 'Right (Green)'}
                  </div>
               </div>
             </div>
@@ -80,3 +80,4 @@ function StudentLookup() {
 }
 
 export default StudentLookup;
+
