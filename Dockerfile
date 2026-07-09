@@ -18,10 +18,10 @@ WORKDIR /app
 
 # Copy package configuration files for caching yarn/npm install steps
 COPY --chown=node:node server/package*.json ./server/
-COPY --chown=node:node "DBMS Project/package*.json" "./DBMS Project/"
+COPY --chown=node:node ["DBMS Project/package*.json", "DBMS Project/"]
 
 # Install dependencies for frontend and backend
-WORKDIR /app/DBMS Project
+WORKDIR "/app/DBMS Project"
 RUN npm install
 
 WORKDIR /app/server
@@ -32,7 +32,7 @@ WORKDIR /app
 COPY --chown=node:node . .
 
 # Build the frontend assets
-WORKDIR /app/DBMS Project
+WORKDIR "/app/DBMS Project"
 RUN npm run build
 
 # Return to root application workspace
