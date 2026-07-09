@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
 const dotenv = require('dotenv');
@@ -265,6 +265,14 @@ app.put('/update-student', async (req, res) => {
     console.error(err);
     res.status(500).send({ message: 'Error updating student', error: err.message });
   }
+});
+
+// Serve static assets from Vite build in production
+const path = require('path');
+app.use(express.static(path.join(__dirname, '../DBMS Project/dist')));
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../DBMS Project/dist/index.html'));
 });
 
 const port = Number(env('PORT', 3001));

@@ -1,8 +1,8 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import axios from 'axios';
 import './AdminDashboard.css'; // We reuse the nice CSS we already made
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_BASE_URL = import.meta.env.VITE_API_URL || window.location.origin;
 
 function StudentLookup() {
   const [usn, setUsn] = useState('');
