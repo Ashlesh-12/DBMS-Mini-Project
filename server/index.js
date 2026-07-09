@@ -271,7 +271,7 @@ app.put('/update-student', async (req, res) => {
 const path = require('path');
 app.use(express.static(path.join(__dirname, '../DBMS Project/dist')));
 
-app.get('*', (req, res) => {
+app.get('/*', (req, res) => {
   res.sendFile(path.join(__dirname, '../DBMS Project/dist/index.html'));
 });
 
