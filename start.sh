@@ -5,7 +5,8 @@ echo "=== System Environment Initialization ==="
 echo "Working directory: $(pwd)"
 echo "Current user: $(whoami) (UID: $(id -u))"
 
-# Set up custom directories in /tmp for MariaDB to make sure they are writable by rootless user 1000
+# Set up custom directories in /tmp for MariaDB, ensuring we clean any dirty state from previous failed boots
+rm -rf /tmp/mysql-data /tmp/mysql-log
 mkdir -p /tmp/mysql-data /tmp/mysql-log
 
 # Initialize database directory if it has not been initialized yet
