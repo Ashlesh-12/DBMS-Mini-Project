@@ -12,9 +12,9 @@ mkdir -p /tmp/mysql-data /tmp/mysql-log
 if [ ! -d "/tmp/mysql-data/mysql" ]; then
     echo "Initializing new MariaDB database files in /tmp/mysql-data..."
     if command -v mariadb-install-db &> /dev/null; then
-        mariadb-install-db --datadir=/tmp/mysql-data --auth-root-authentication-method=normal --skip-test-db
+        mariadb-install-db --datadir=/tmp/mysql-data --user=node --auth-root-authentication-method=normal --skip-test-db
     else
-        mysql_install_db --datadir=/tmp/mysql-data --auth-root-authentication-method=normal --skip-test-db
+        mysql_install_db --datadir=/tmp/mysql-data --user=node --auth-root-authentication-method=normal --skip-test-db
     fi
     echo "MariaDB database files initialized successfully."
 else
@@ -23,7 +23,7 @@ fi
 
 echo "Starting MariaDB daemon in the background..."
 # Start mysqld process in the background, redirecting logs to a file in /tmp/mysql-log
-mysqld --datadir=/tmp/mysql-data --port=3306 --bind-address=127.0.0.1 \
+mysqld --user=node --datadir=/tmp/mysql-data --port=3306 --bind-address=127.0.0.1 \
        --socket=/tmp/mysql.sock --pid-file=/tmp/mysqld.pid \
        --general-log-file=/tmp/mysql-log/mysql.log --log-error=/tmp/mysql-log/mysql-err.log &
 
