@@ -10,7 +10,7 @@ pinned: false
 
 # AERAS - Sahyadri College Examination Control System
 
-**🔴 Live Demo / Access Project Here:** [https://huggingface.co/spaces/Ashlesh-12/DBMS-Mini-Project](https://huggingface.co/spaces/Ashlesh-12/DBMS-Mini-Project)
+**🔴 Live Demo / Access Project Here:** [https://database-sql.onrender.com/](https://database-sql.onrender.com/)
 
 AERAS is a modern, web-based examination seating and room allocation control system designed for college administrators and students. 
 
