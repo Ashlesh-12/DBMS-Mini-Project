@@ -72,7 +72,7 @@ Create a file named `.env` inside the `server/` directory and paste this:
 DB_HOST=127.0.0.1
 DB_PORT=3306
 DB_USER=root
-DB_PASSWORD=Ashlesh@12
+DB_PASSWORD=your_database_password_here
 DB_NAME=aeras_db
 DB_SSL=false
 ```
@@ -80,7 +80,7 @@ DB_SSL=false
 **Frontend (`DBMS Project/.env`)**:
 Create a file named `.env` inside the `DBMS Project/` directory and paste this:
 ```env
-# VITE_API_URL=https://dbms-mini-project-1.onrender.com
+# VITE_API_URL=https://your-production-url.onrender.com
 ```
 
 ### 2. Install Dependencies
